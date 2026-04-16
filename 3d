@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Paleteira 3D - Elevação dos Garfos</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #ffffff; 
+            font-family: 'Segoe UI', sans-serif; 
+        }
+        #interface { 
+            position: absolute; 
+            top: 20px; 
+            left: 20px; 
+            background: rgba(255, 255, 255, 0.9); 
+            padding: 20px; 
+            border-radius: 12px; 
+            border: 1px solid #ccc; 
+            width: 280px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        input[type=range] { width: 100%; cursor: pointer; accent-color: #edb900; }
+        label { display: block; font-size: 11px; font-weight: bold; margin-bottom: 5px; color: #666; }
+        h2 { margin: 0 0 10px 0; font-size: 18px; color: #333; border-bottom: 2px solid #edb900; padding-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="interface">
+    <h2>Paleteira Técnica</h2>
+    <div class="control-group">
+        <label>ELEVAÇÃO (APENAS GARFOS E RODAS FRONTAIS)</label>
+        <input type="range" id="liftInput" min="0" max="1.2" step="0.01" value="0">
+    </div>
+    <p style="font-size: 11px; color: #888;">O chassi e o timão permanecem fixos no solo.</p>
+</div>
+
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xfefefe);
+    
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(12, 8, 12);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 15, 10);
+    light.castShadow = true;
+    scene.add(light);
+
+    const matAmarelo = new THREE.MeshStandardMaterial({ color: 0xffcc00, roughness: 0.3, metalness: 0.2 });
+    const matChassi = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.4, metalness: 0.6 });
+    const matPneu = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+
+    const paleteiraGlobal = new THREE.Group();
+    scene.add(paleteiraGlobal);
+
+    // --- 1. PARTE MÓVEL: APENAS OS GARFOS E RODAS DO GARFO ---
+    const conjuntoGarfosMoveis = new THREE.Group();
+    paleteiraGlobal.add(conjuntoGarfosMoveis);
+
+    const shapeGarfo = new THREE.Shape();
+    shapeGarfo.moveTo(0, 0); shapeGarfo.lineTo(7, 0); shapeGarfo.lineTo(7.4, 0.1); 
+    shapeGarfo.lineTo(7.4, 0.3); shapeGarfo.lineTo(0, 0.6); shapeGarfo.lineTo(0, 0);
+
+    const extrudeSettings = { depth: 1.2, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02 };
+    
+    const garfoEsq = new THREE.Mesh(new THREE.ExtrudeGeometry(shapeGarfo, extrudeSettings), matAmarelo);
+    garfoEsq.rotation.y = -Math.PI / 2;
+    garfoEsq.position.set(-0.6, 0.3, -0.5);
+    
+    const garfoDir = garfoEsq.clone();
+    garfoDir.position.set(1.8, 0.3, -0.5);
+
+    // RODAS DO GARFO (Sobem junto com os garfos)
+    const geoRodaCarga = new THREE.CylinderGeometry(0.3, 0.3, 0.6, 16);
+    geoRodaCarga.rotateZ(Math.PI/2);
+    const rc1 = new THREE.Mesh(geoRodaCarga, matPneu);
+    rc1.position.set(-1.2, 0.3, 6.2);
+    const rc2 = rc1.clone();
+    rc2.position.set(1.2, 0.3, 6.2);
+
+    conjuntoGarfosMoveis.add(garfoEsq, garfoDir, rc1, rc2);
+
+    // --- 2. PARTE FIXA: CHASSI, TIMÃO E RODAS TRASEIRAS ---
+    const estruturaFixa = new THREE.Group();
+    paleteiraGlobal.add(estruturaFixa);
+
+    // Caixa Principal (Chassi)
+    const shapeChassi = new THREE.Shape();
+    shapeChassi.moveTo(0, 0); shapeChassi.lineTo(2.5, 0); shapeChassi.lineTo(2.5, 2.5);
+    shapeChassi.lineTo(1.5, 3.2); shapeChassi.lineTo(0, 3.2); shapeChassi.lineTo(0, 0);
+
+    const corpoTraseiro = new THREE.Mesh(new THREE.ExtrudeGeometry(shapeChassi, { depth: 3.5, bevelEnabled: true }), matAmarelo);
+    corpoTraseiro.rotation.y = -Math.PI / 2;
+    corpoTraseiro.position.set(1.75, 0.3, -3);
+    corpoTraseiro.castShadow = true;
+
+    // Timão (Parado)
+    const hasteTimao = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 6, 16), matChassi);
+    hasteTimao.position.set(0, 4, -3.5);
+    const pegaMao = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.1, 12, 32), matChassi);
+    pegaMao.rotation.x = Math.PI/2;
+    pegaMao.position.set(0, 7, -3.5);
+
+    // Rodas Traseiras (Paradas)
+    const geoRodaT = new THREE.CylinderGeometry(0.7, 0.7, 1, 32);
+    geoRodaT.rotateZ(Math.PI/2);
+    
+    const rodaT1 = new THREE.Mesh(geoRodaT, matPneu);
+    rodaT1.position.set(0.6, 0.7, -3.5);
+    const rodaT2 = new THREE.Mesh(geoRodaT, matPneu);
+    rodaT2.position.set(-0.6, 0.7, -3.5);
+
+    estruturaFixa.add(corpoTraseiro, hasteTimao, pegaMao, rodaT1, rodaT2);
+
+    // --- CHÃO ---
+    const grid = new THREE.GridHelper(40, 40, 0xcccccc, 0xeeeeee);
+    scene.add(grid);
+
+    // --- ANIMAÇÃO ---
+    const controls = new OrbitControls(camera, renderer.domElement);
+    const liftInput = document.getElementById('liftInput');
+
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        // Agora o slider move APENAS os garfos e as rodinhas frontais
+        conjuntoGarfosMoveis.position.y = parseFloat(liftInput.value);
+
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+</script>
+</body>
+</html>
